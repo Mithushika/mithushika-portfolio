@@ -31,12 +31,13 @@ jobs:
             -p 127.0.0.1:8080:8080 \
             portfolio:ci
 
-      - name: Check website response
+            - name: Check website response
         run: |
           curl --fail --silent --show-error \
             --retry 10 \
-            --retry-connrefused \
+            --retry-all-errors \
             --retry-delay 2 \
+            --retry-max-time 60 \
             --max-time 10 \
             http://127.0.0.1:8080/ \
             -o /tmp/portfolio.html
