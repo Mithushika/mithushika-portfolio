@@ -1,4 +1,4 @@
-name: Portfolio CI
+name: Portfolio CI and Deploy
 
 on:
   push:
@@ -9,6 +9,10 @@ on:
 
 permissions:
   contents: read
+
+concurrency:
+  group: portfolio-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   build-and-check:
@@ -21,8 +25,11 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Build Docker image
-        run: docker build -t portfolio:ci .
+      - name: Build Docker image for GitHub Pages
+        run: |
+          docker build \
+            --build-arg BASE_HREF=/mithushika-portfolio/ \
+            -t portfolio:ci .
 
       - name: Start portfolio container
         run: |
@@ -43,6 +50,19 @@ jobs:
             -o /tmp/portfolio.html
 
           grep -q '<app-root' /tmp/portfolio.html
+          grep -q 'base href="/mithushika-portfolio/"' /tmp/portfolio.html
+
+      - name: Extract built website
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        run: |
+          mkdir -p site
+          docker cp portfolio-ci:/usr/share/nginx/html/. site/
+
+      - name: Upload website for deployment
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
 
       - name: Show container logs
         if: always()
@@ -51,3 +71,21 @@ jobs:
       - name: Remove container
         if: always()
         run: docker rm -f portfolio-ci || true
+
+  deploy:
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: build-and-check
+    runs-on: ubuntu-latest
+
+    permissions:
+      pages: write
+      id-token: write
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

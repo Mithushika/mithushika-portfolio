@@ -1,4 +1,4 @@
-# Stage 1: Build the Angular application
+# Stage 1: Build Angular
 FROM node:22-bookworm-slim AS build
 
 WORKDIR /app
@@ -9,9 +9,11 @@ COPY package.json package-lock.json ./
 RUN npm ci
 
 COPY . .
-RUN npm run build
 
-# Stage 2: Serve the generated website
+ARG BASE_HREF=/
+RUN npm run build -- --base-href "$BASE_HREF"
+
+# Stage 2: Serve the website
 FROM nginx:stable-alpine
 
 COPY nginx.conf /etc/nginx/conf.d/default.conf
